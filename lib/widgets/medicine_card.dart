@@ -74,10 +74,22 @@ class MedicineCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                IconButton(
-                  onPressed: onAdd,
-                  icon: const Icon(Icons.add_circle, color: AppColors.primary),
-                  tooltip: 'Add to cart',
+                const SizedBox(width: 8),
+                Material(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    onTap: onAdd,
+                    borderRadius: BorderRadius.circular(14),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(
+                        Icons.add_shopping_cart_rounded,
+                        color: AppColors.primaryDark,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
