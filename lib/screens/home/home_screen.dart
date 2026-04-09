@@ -293,7 +293,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -304,7 +308,11 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: 2),
             Text(
               'Malolos, Bulacan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
           ],
         ),
@@ -321,9 +329,21 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CustomTextField(
-                hintText: 'Search medicines or categories',
-                prefixIcon: Icons.search,
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryDark.withValues(alpha: 0.05),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const CustomTextField(
+                  hintText: 'Search medicines or categories',
+                  prefixIcon: Icons.search,
+                ),
               ),
               const SizedBox(height: 18),
               Container(
@@ -332,8 +352,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [AppColors.primary, AppColors.primaryDark],
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryDark.withValues(alpha: 0.18),
+                      blurRadius: 24,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -380,9 +409,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: AppColors.secondary),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: AppColors.primaryDark.withValues(alpha: 0.06),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -512,6 +542,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: NavigationBar(
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.secondary,
         selectedIndex: 0,
         onDestinationSelected: (_) {},
         destinations: const [
