@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pharmacy_marketplace_app/core/constants/app_colors.dart';
+import 'package:pharmacy_marketplace_app/data/medicine_catalog.dart';
+import 'package:pharmacy_marketplace_app/models/medicine_item.dart';
+import 'package:pharmacy_marketplace_app/screens/home/widgets/add_to_cart_sheet.dart';
 import 'package:pharmacy_marketplace_app/widgets/category_card.dart';
 import 'package:pharmacy_marketplace_app/widgets/custom_text_field.dart';
 import 'package:pharmacy_marketplace_app/widgets/medicine_card.dart';
@@ -14,13 +17,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  void _showAddToCartSheet({
-    required String name,
-    required String genericName,
-    required double price,
-    required bool requiresPrescription,
-  }) {
+  void _showAddToCartSheet(MedicineItem medicine) {
     var quantity = 1;
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -28,232 +27,20 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final total = price * quantity;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 42,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 58,
-                            height: 58,
-                            decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(
-                              Icons.medication_outlined,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Add to cart',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  name,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  genericName,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (requiresPrescription)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.warning.withValues(
-                                  alpha: 0.12,
-                                ),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'Prescription',
-                                style: TextStyle(
-                                  color: AppColors.warning,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Unit price',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '\$${price.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppColors.secondary),
-                              ),
-                              child: Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: quantity == 1
-                                        ? null
-                                        : () => setModalState(() {
-                                            quantity--;
-                                          }),
-                                    icon: const Icon(Icons.remove),
-                                  ),
-                                  Text(
-                                    '$quantity',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    onPressed: () => setModalState(() {
-                                      quantity++;
-                                    }),
-                                    icon: const Icon(Icons.add),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.secondary),
-                        ),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Estimated total',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Pickup or delivery options at checkout',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              '\$${total.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                behavior: SnackBarBehavior.floating,
-                                content: Text(
-                                  '$quantity x $name added to cart',
-                                ),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryDark,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: const Text(
-                            'Confirm Add To Cart',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ],
+            return AddToCartSheet(
+              medicine: medicine,
+              quantity: quantity,
+              onDecrease: () => setModalState(() => quantity--),
+              onIncrease: () => setModalState(() => quantity++),
+              onConfirm: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    behavior: SnackBarBehavior.floating,
+                    content: Text('$quantity x ${medicine.name} added to cart'),
                   ),
-                ),
-              ),
+                );
+              },
             );
           },
         );
@@ -269,28 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
       (name: 'Cold & Flu', icon: Icons.masks_outlined),
       (name: 'Diabetes', icon: Icons.monitor_heart_outlined),
     ];
-
-    final medicines = <({String name, String generic, double price, bool rx})>[
-      (name: 'Biogesic', generic: 'Paracetamol', price: 4.25, rx: false),
-      (
-        name: 'Amoxiclav',
-        generic: 'Amoxicillin + Clavulanate',
-        price: 18.50,
-        rx: true,
-      ),
-      (
-        name: 'Neozep Forte',
-        generic: 'Phenylephrine + Paracetamol',
-        price: 6.75,
-        rx: false,
-      ),
-      (
-        name: 'Atorvastatin',
-        generic: 'Atorvastatin Calcium',
-        price: 14.30,
-        rx: true,
-      ),
-    ];
+    final medicines = medicineCatalog;
+    final featuredMedicines = medicines.take(3).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -302,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good morning 👋',
+              'Good morning',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
             SizedBox(height: 2),
@@ -400,6 +167,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Featured Essentials',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  TextButton(onPressed: () {}, child: const Text('Browse')),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 108,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: featuredMedicines.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final medicine = featuredMedicines[index];
+                    return _FeaturedMedicineImageCard(medicine: medicine);
+                  },
                 ),
               ),
               const SizedBox(height: 20),
@@ -519,21 +311,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.71,
+                  childAspectRatio: 0.62,
                 ),
                 itemBuilder: (context, index) {
                   final med = medicines[index];
                   return MedicineCard(
                     name: med.name,
-                    genericName: med.generic,
+                    genericName: med.genericName,
+                    description: med.description,
+                    imageAsset: med.imageAsset,
                     price: med.price,
-                    requiresPrescription: med.rx,
-                    onAdd: () => _showAddToCartSheet(
-                      name: med.name,
-                      genericName: med.generic,
-                      price: med.price,
-                      requiresPrescription: med.rx,
-                    ),
+                    requiresPrescription: med.requiresPrescription,
+                    onAdd: () => _showAddToCartSheet(med),
                   );
                 },
               ),
@@ -566,6 +355,70 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedMedicineImageCard extends StatelessWidget {
+  const _FeaturedMedicineImageCard({required this.medicine});
+
+  final MedicineItem medicine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 168,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.secondary),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset(medicine.imageAsset, fit: BoxFit.contain),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  medicine.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  medicine.genericName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

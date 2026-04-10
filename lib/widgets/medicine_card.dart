@@ -6,6 +6,8 @@ class MedicineCard extends StatelessWidget {
     super.key,
     required this.name,
     required this.genericName,
+    required this.description,
+    required this.imageAsset,
     required this.price,
     this.requiresPrescription = false,
     this.onAdd,
@@ -13,6 +15,8 @@ class MedicineCard extends StatelessWidget {
 
   final String name;
   final String genericName;
+  final String description;
+  final String imageAsset;
   final double price;
   final bool requiresPrescription;
   final VoidCallback? onAdd;
@@ -31,11 +35,14 @@ class MedicineCard extends StatelessWidget {
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.medication_outlined,
-                    size: 40,
-                    color: AppColors.primary,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Image.asset(
+                      imageAsset,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
@@ -44,6 +51,16 @@ class MedicineCard extends StatelessWidget {
             Text(name, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 3),
             Text(genericName, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.35,
+              ),
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
