@@ -78,7 +78,7 @@ class AddToCartSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          medicine.genericName,
+                          '${medicine.manufacturer} - ${medicine.packageSize}',
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
@@ -206,18 +206,18 @@ class AddToCartSheet extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Estimated total',
                             style: TextStyle(color: AppColors.textSecondary),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Pickup or delivery options at checkout',
-                            style: TextStyle(fontSize: 12),
+                            'Category: ${medicine.categoryLabel}',
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ],
                       ),
