@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pharmacy_marketplace_app/core/constants/app_colors.dart';
+import 'package:pharmacy_marketplace_app/core/utils/currency.dart';
 import 'package:pharmacy_marketplace_app/models/medicine_item.dart';
 
 class HomeFeaturedProducts extends StatelessWidget {
@@ -144,7 +145,7 @@ class _FeaturedProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                '\$${medicine.price.toStringAsFixed(2)}',
+                formatPrice(medicine.price),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,

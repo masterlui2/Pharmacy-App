@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pharmacy_marketplace_app/core/constants/app_colors.dart';
+import 'package:pharmacy_marketplace_app/core/utils/currency.dart';
 import 'package:pharmacy_marketplace_app/models/medicine_item.dart';
 
 class AddToCartSheet extends StatelessWidget {
@@ -158,7 +159,7 @@ class AddToCartSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '\$${medicine.price.toStringAsFixed(2)}',
+                          formatPrice(medicine.price),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
@@ -223,7 +224,7 @@ class AddToCartSheet extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '\$${total.toStringAsFixed(2)}',
+                      formatPrice(total),
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
