@@ -314,8 +314,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _checkout() {
+    final paymentLine = _paymentMethod == PaymentMethod.cod
+        ? 'Checkout ready with Cash on Delivery.'
+        : 'Checkout ready with ${_paymentMethod.label} via PayMongo.';
     final message = _isDeliveryAvailable
-        ? 'Checkout ready with ${_paymentMethod.label} via PayMongo.${MapsConfig.isConfigured ? '' : ' Add your Google Maps key in lib/core/config/app_api_keys.dart for live maps integration.'}'
+        ? '$paymentLine${MapsConfig.isConfigured ? '' : ' Add your Google Maps key in lib/core/config/app_api_keys.dart for live maps integration.'}'
         : 'This address is outside the Davao delivery radius.';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),

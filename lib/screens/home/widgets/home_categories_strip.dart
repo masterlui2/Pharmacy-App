@@ -8,7 +8,7 @@ class HomeCategoriesStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 102,
+      height: 116,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
@@ -38,25 +38,26 @@ class _HomeCategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 84,
+      width: 92,
       child: Column(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFF2E6E8)),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryDark.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
+                  color: const Color(0x14150F10),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(14),
               child: Image.asset(
                 imageAsset,
                 fit: BoxFit.contain,
@@ -77,9 +78,10 @@ class _HomeCategoryTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               color: AppColors.textPrimary,
-              height: 1.15,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

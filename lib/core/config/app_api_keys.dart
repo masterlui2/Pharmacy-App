@@ -1,10 +1,10 @@
 class AppApiKeys {
   const AppApiKeys._();
 
-  // Paste your Google Maps API key here.
+  // Keep real keys out of git. Load them locally before building.
   static const String googleMapsApiKey = '';
 
-  // Paste your PayMongo public key here only for local testing if needed.
+  // Publishable keys can still be rotated and injected locally.
   static const String paymongoPublicKey = '';
 
   // Never commit a PayMongo secret key in a Flutter app.

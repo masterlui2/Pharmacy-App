@@ -1,7 +1,8 @@
 enum PaymentMethod {
   gcash('GCash', 'PayMongo e-wallet'),
   maya('Maya', 'PayMongo e-wallet'),
-  card('Card', 'Visa / Mastercard via PayMongo');
+  card('Card', 'Visa / Mastercard via PayMongo'),
+  cod('Cash on Delivery', 'Pay when the rider arrives');
 
   const PaymentMethod(this.label, this.caption);
 

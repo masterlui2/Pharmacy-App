@@ -53,11 +53,11 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  _CheckoutStep _step = _CheckoutStep.address;
+  _CheckoutStep _step = _CheckoutStep.payment;
 
   void _handleBack() {
     if (_step == _CheckoutStep.payment) {
-      setState(() => _step = _CheckoutStep.address);
+      widget.onBack();
       return;
     }
     widget.onBack();
@@ -84,9 +84,8 @@ class _CartScreenState extends State<CartScreen> {
             _CheckoutHeader(
               step: _step,
               onBack: _handleBack,
+              deliveryDistanceKm: widget.deliveryDistanceKm,
             ),
-            const SizedBox(height: 18),
-            _CheckoutProgress(step: _step),
             const SizedBox(height: 18),
             Expanded(
               child: widget.items.isEmpty
@@ -120,6 +119,7 @@ class _CartScreenState extends State<CartScreen> {
                               paymentMethod: widget.paymentMethod,
                               onPaymentMethodChanged:
                                   widget.onPaymentMethodChanged,
+                              deliveryDistanceKm: widget.deliveryDistanceKm,
                               deliveryFee: widget.deliveryFee,
                               serviceFee: serviceFee,
                               subtotal: subtotal,
@@ -140,19 +140,26 @@ class _CheckoutHeader extends StatelessWidget {
   const _CheckoutHeader({
     required this.step,
     required this.onBack,
+    required this.deliveryDistanceKm,
   });
 
   final _CheckoutStep step;
   final VoidCallback onBack;
+  final double? deliveryDistanceKm;
 
   @override
   Widget build(BuildContext context) {
+    final etaMinutes = deliveryDistanceKm == null
+        ? 20
+        : (12 + (deliveryDistanceKm! * 4.2)).round();
     final title = step == _CheckoutStep.address
         ? 'Delivery address'
-        : 'Payment';
+        : 'QuickCare Pharmacy';
     final caption = step == _CheckoutStep.address
         ? 'Step 1 of 2'
-        : 'Step 2 of 2';
+        : deliveryDistanceKm == null
+            ? 'Distance from you: calculating... (${etaMinutes} mins)'
+            : 'Distance from you: ${deliveryDistanceKm!.toStringAsFixed(1)} km (${etaMinutes} mins)';
 
     return Row(
       children: [
@@ -187,15 +194,19 @@ class _CheckoutHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.secondary,
+            color: step == _CheckoutStep.payment
+                ? const Color(0xFFEAF7EE)
+                : AppColors.secondary,
             borderRadius: BorderRadius.circular(999),
           ),
-          child: const Text(
-            'Clean checkout',
+          child: Text(
+            step == _CheckoutStep.payment ? 'Open now' : 'Clean checkout',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.primaryDark,
+              color: step == _CheckoutStep.payment
+                  ? const Color(0xFF15803D)
+                  : AppColors.primaryDark,
             ),
           ),
         ),
@@ -539,6 +550,7 @@ class _PaymentStepView extends StatelessWidget {
     required this.onDecrease,
     required this.paymentMethod,
     required this.onPaymentMethodChanged,
+    required this.deliveryDistanceKm,
     required this.deliveryFee,
     required this.serviceFee,
     required this.subtotal,
@@ -555,6 +567,7 @@ class _PaymentStepView extends StatelessWidget {
   final void Function(int index) onDecrease;
   final PaymentMethod paymentMethod;
   final ValueChanged<PaymentMethod> onPaymentMethodChanged;
+  final double? deliveryDistanceKm;
   final double deliveryFee;
   final double serviceFee;
   final double subtotal;
@@ -564,165 +577,99 @@ class _PaymentStepView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final driverNote = address.notes.trim().isEmpty
+        ? 'Add a note to driver'
+        : address.notes.trim();
+    final deliveryMeta = deliveryDistanceKm == null
+        ? 'Delivery is being estimated for this address.'
+        : '${deliveryDistanceKm!.toStringAsFixed(1)} km away - arrives in about ${(12 + (deliveryDistanceKm! * 4.2)).round()} mins';
+    final promoHint = paymentMethod == PaymentMethod.cod
+        ? 'Promo not applied'
+        : 'Add a promo';
+    void showPaymentPicker() {
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return _PaymentMethodSheet(
+            selectedMethod: paymentMethod,
+            onSelected: (method) {
+              Navigator.of(context).pop();
+              onPaymentMethodChanged(method);
+            },
+          );
+        },
+      );
+    }
+
     return Column(
       children: [
         Expanded(
           child: ListView(
             children: [
-              _SectionCard(
-                title: 'Deliver to',
-                subtitle: 'Review the address before selecting payment.',
+              _CheckoutSection(
+                title: 'Delivery information',
                 child: Column(
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.location_on_outlined,
-                            color: AppColors.primaryDark,
-                          ),
+                    _InfoRow(
+                      icon: Icons.location_on_outlined,
+                      title: address.shortAddress,
+                      subtitle:
+                          '${address.recipientName} - ${address.phoneNumber}',
+                      trailing: IconButton(
+                        onPressed: onEditAddress,
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          color: AppColors.primaryDark,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                address.addressLabel,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                address.shortAddress,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  height: 1.45,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${address.recipientName} • ${address.phoneNumber}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: onEditAddress,
-                          child: const Text('Edit'),
-                        ),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _InfoRow(
+                      icon: Icons.sticky_note_2_outlined,
+                      title: driverNote,
+                      subtitle: deliveryMeta,
+                      trailing: TextButton(
+                        onPressed: onEditAddress,
+                        child: const Text('Edit'),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Mode of payment',
-                subtitle: 'Choose the payment option that will be processed through PayMongo.',
-                child: Column(
-                  children: PaymentMethod.values.map((method) {
-                    final isSelected = method == paymentMethod;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () => onPaymentMethodChanged(method),
-                        borderRadius: BorderRadius.circular(20),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.primaryDark
-                                : AppColors.background,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                method == PaymentMethod.card
-                                    ? Icons.credit_card_rounded
-                                    : Icons.account_balance_wallet_rounded,
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.primaryDark,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      method.label,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    Text(
-                                      method.caption,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? Colors.white70
-                                            : AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                isSelected
-                                    ? Icons.check_circle_rounded
-                                    : Icons.circle_outlined,
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
-                              ),
-                            ],
-                          ),
-                        ),
+              _CheckoutSection(
+                title: 'Order Summary',
+                actionLabel: 'Add items',
+                onActionTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Use the quantity controls below to add more items.',
                       ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Order items',
-                subtitle: '${items.length} medicine item(s)',
+                    ),
+                  );
+                },
                 child: Column(
                   children: [
                     for (var index = 0; index < items.length; index++) ...[
-                      _CartItemCard(
+                      _CheckoutSummaryItem(
                         item: items[index],
                         onRemove: () => onRemove(index),
                         onIncrease: () => onIncrease(index),
                         onDecrease: () => onDecrease(index),
                       ),
                       if (index != items.length - 1)
-                        const SizedBox(height: 14),
+                        const Divider(height: 24, color: Color(0xFFF1E8EA)),
                     ],
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF1E8EA)),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Order summary',
-                subtitle: address.shortAddress,
+              _CheckoutSection(
+                title: 'Pricing breakdown',
                 child: Column(
                   children: [
                     _SummaryRow(
@@ -739,6 +686,10 @@ class _PaymentStepView extends StatelessWidget {
                       label: 'Platform fee',
                       value: formatPrice(serviceFee),
                     ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Divider(height: 1, color: Color(0xFFF1E8EA)),
+                    ),
                     const SizedBox(height: 12),
                     _SummaryRow(
                       label: 'Total',
@@ -748,17 +699,587 @@ class _PaymentStepView extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              _CheckoutSection(
+                title: 'Payment method',
+                child: Column(
+                  children: [
+                    _SelectedPaymentRow(
+                      method: paymentMethod,
+                      onTap: showPaymentPicker,
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: Color(0xFFF1E8EA)),
+                    const SizedBox(height: 12),
+                    _PromoRow(
+                      label: promoHint,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Promo code entry can be connected here next.',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         _BottomActionBar(
-          title: 'Total',
+          title: 'Total estimated cost',
           value: formatPrice(total),
-          buttonLabel: 'Place order with ${paymentMethod.label}',
+          buttonLabel: 'Place Order',
           onPressed: isDeliveryAvailable ? onCheckout : null,
         ),
       ],
+    );
+  }
+}
+
+class _CheckoutInfoCard extends StatelessWidget {
+  const _CheckoutInfoCard({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12150F10),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CheckoutSection extends StatelessWidget {
+  const _CheckoutSection({
+    required this.title,
+    required this.child,
+    this.actionLabel,
+    this.onActionTap,
+  });
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onActionTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CheckoutInfoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (actionLabel != null)
+                TextButton(
+                  onPressed: onActionTap,
+                  child: Text(actionLabel!),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F2F3),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: AppColors.primaryDark),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+class _CheckoutSummaryItem extends StatelessWidget {
+  const _CheckoutSummaryItem({
+    required this.item,
+    required this.onRemove,
+    required this.onIncrease,
+    required this.onDecrease,
+  });
+
+  final CartItem item;
+  final VoidCallback onRemove;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6EFF1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '${item.quantity}x',
+            style: const TextStyle(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.medicine.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${item.medicine.manufacturer} - ${item.medicine.packageSize}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _QuantityButton(
+                    icon: Icons.remove,
+                    onTap: item.quantity == 1 ? null : onDecrease,
+                  ),
+                  const SizedBox(width: 10),
+                  _QuantityButton(
+                    icon: Icons.add,
+                    onTap: onIncrease,
+                    highlight: true,
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: onRemove,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Remove'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          formatPrice(item.medicine.price * item.quantity),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentTag extends StatelessWidget {
+  const _PaymentTag({
+    required this.method,
+  });
+
+  final PaymentMethod method;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCod = method == PaymentMethod.cod;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isCod ? const Color(0xFFFFF4E8) : const Color(0xFFF4F2FB),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isCod ? Icons.payments_outlined : Icons.shield_outlined,
+            color: isCod ? const Color(0xFFC56A1A) : const Color(0xFF7A4D9E),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isCod
+                  ? 'Cash will be collected when the order arrives.'
+                  : 'Digital payments are processed securely through PayMongo.',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _paymentIcon(PaymentMethod method) {
+  switch (method) {
+    case PaymentMethod.card:
+      return Icons.credit_card_rounded;
+    case PaymentMethod.cod:
+      return Icons.payments_outlined;
+    case PaymentMethod.gcash:
+    case PaymentMethod.maya:
+      return Icons.account_balance_wallet_rounded;
+  }
+}
+
+Color _paymentAccent(PaymentMethod method) {
+  switch (method) {
+    case PaymentMethod.gcash:
+      return const Color(0xFF3E5B9A);
+    case PaymentMethod.maya:
+      return const Color(0xFF1C7A72);
+    case PaymentMethod.card:
+      return const Color(0xFF7A4D9E);
+    case PaymentMethod.cod:
+      return const Color(0xFFC56A1A);
+  }
+}
+
+class _SelectedPaymentRow extends StatelessWidget {
+  const _SelectedPaymentRow({
+    required this.method,
+    required this.onTap,
+  });
+
+  final PaymentMethod method;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F4F5),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _paymentIcon(method),
+                color: _paymentAccent(method),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Selected payment method',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    method.label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Text(
+              'Change',
+              style: TextStyle(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentMethodSheet extends StatelessWidget {
+  const _PaymentMethodSheet({
+    required this.selectedMethod,
+    required this.onSelected,
+  });
+
+  final PaymentMethod selectedMethod;
+  final ValueChanged<PaymentMethod> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 46,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6D8DB),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Choose payment method',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...PaymentMethod.values.map((method) {
+              final isSelected = method == selectedMethod;
+              final accent = _paymentAccent(method);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => onSelected(method),
+                  borderRadius: BorderRadius.circular(22),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? accent : const Color(0xFFF9F4F5),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color:
+                            isSelected ? accent : const Color(0xFFEFE2E5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.22)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            _paymentIcon(method),
+                            color: isSelected ? Colors.white : accent,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                method.label,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                method.caption,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white.withValues(alpha: 0.86)
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isSelected
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFFBFAFB4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PromoRow extends StatelessWidget {
+  const _PromoRow({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9F2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.local_offer_outlined,
+              color: Color(0xFF15803D),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.textSecondary,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1100,7 +1621,7 @@ class _SummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = TextStyle(
-      fontSize: 15,
+      fontSize: emphasize ? 18 : 13.5,
       fontWeight: emphasize ? FontWeight.w800 : FontWeight.w500,
       color: emphasize ? AppColors.textPrimary : AppColors.textSecondary,
     );

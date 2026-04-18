@@ -86,7 +86,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _ProfileCard(
-            title: 'PayMongo',
+            title: 'Payment',
             icon: Icons.account_balance_wallet_outlined,
             child: Text(
               'Preferred payment: ${paymentMethod.label} (${paymentMethod.caption})',
