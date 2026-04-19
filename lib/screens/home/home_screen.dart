@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:pharmacy_marketplace_app/core/config/app_api_keys.dart';
 import 'package:pharmacy_marketplace_app/core/config/maps_config.dart';
 import 'package:pharmacy_marketplace_app/data/medicine_catalog.dart';
 import 'package:pharmacy_marketplace_app/models/cart_item.dart';
@@ -16,6 +20,7 @@ import 'package:pharmacy_marketplace_app/screens/home/widgets/home_promo_banner.
 import 'package:pharmacy_marketplace_app/screens/home/widgets/home_section_header.dart';
 import 'package:pharmacy_marketplace_app/screens/profile/profile_screen.dart';
 import 'package:pharmacy_marketplace_app/screens/wishlist/wishlist_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -313,16 +318,225 @@ class _HomeScreenState extends State<HomeScreen> {
     return nearest;
   }
 
-  void _checkout() {
-    final paymentLine = _paymentMethod == PaymentMethod.cod
-        ? 'Checkout ready with Cash on Delivery.'
-        : 'Checkout ready with ${_paymentMethod.label} via PayMongo.';
-    final message = _isDeliveryAvailable
-        ? '$paymentLine${MapsConfig.isConfigured ? '' : ' Add your Google Maps key in lib/core/config/app_api_keys.dart for live maps integration.'}'
-        : 'This address is outside the Davao delivery radius.';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  Future<void> _checkout() async {
+    if (!_isDeliveryAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This address is outside the Davao delivery radius.'),
+        ),
+      );
+      return;
+    }
+
+    if (_paymentMethod == PaymentMethod.cod) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cash on Delivery selected. Order is ready to confirm.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final endpoint = AppApiKeys.paymongoCheckoutSessionEndpoint.trim();
+    if (endpoint.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add your checkout-session backend URL in lib/core/config/app_api_keys.dart.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final checkoutUrl = await _createDynamicCheckoutUrl(endpoint);
+    if (!mounted || checkoutUrl == null || checkoutUrl.isEmpty) {
+      return;
+    }
+
+    final uri = Uri.tryParse(checkoutUrl);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The PayMongo checkout URL is invalid.')),
+      );
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open the PayMongo checkout page.'),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _createDynamicCheckoutUrl(String endpoint) async {
+    final uri = Uri.tryParse(endpoint);
+    if (uri == null ||
+        !uri.hasScheme ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The checkout-session backend URL is invalid.'),
+        ),
+      );
+      return null;
+    }
+
+    final subtotal = _cartItems.fold<double>(
+      0,
+      (sum, item) => sum + (item.medicine.price * item.quantity),
     );
+    const serviceFee = 15.0;
+    final total = subtotal + _deliveryFee + serviceFee;
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'payment_method': _payMongoPaymentMethodType(_paymentMethod),
+          'reference_number': 'order_${DateTime.now().millisecondsSinceEpoch}',
+          'currency': 'PHP',
+          'customer': {
+            'name': _deliveryAddress.recipientName,
+            'phone': _deliveryAddress.phoneNumber,
+            'address_label': _deliveryAddress.addressLabel,
+            'street_address': _deliveryAddress.streetAddress,
+            'barangay': _deliveryAddress.barangay,
+            'city': _deliveryAddress.city,
+            'notes': _deliveryAddress.notes,
+          },
+          'line_items': _cartItems
+              .map((item) => {
+                    'name': item.medicine.name,
+                    'description':
+                        '${item.medicine.manufacturer} - ${item.medicine.packageSize}',
+                    'quantity': item.quantity,
+                    'amount': (item.medicine.price * 100).round(),
+                    'currency': 'PHP',
+                  })
+              .toList(growable: false),
+          'summary': {
+            'subtotal': (subtotal * 100).round(),
+            'delivery_fee': (_deliveryFee * 100).round(),
+            'service_fee': (serviceFee * 100).round(),
+            'total': (total * 100).round(),
+          },
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = _extractBackendErrorMessage(response.body);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                message == null
+                    ? 'Checkout session failed (${response.statusCode}).'
+                    : 'Checkout session failed: $message',
+              ),
+            ),
+          );
+        }
+        return null;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Backend response is not valid JSON.'),
+            ),
+          );
+        }
+        return null;
+      }
+
+      final checkoutUrl = decoded['checkout_url'];
+      if (checkoutUrl is! String || checkoutUrl.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Backend did not return a checkout_url.'),
+            ),
+          );
+        }
+        return null;
+      }
+
+      return checkoutUrl.trim();
+    } on http.ClientException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to connect to the checkout backend.'),
+          ),
+        );
+      }
+      return null;
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backend response is malformed JSON.'),
+          ),
+        );
+      }
+      return null;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to contact the checkout backend.'),
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  String? _extractBackendErrorMessage(String body) {
+    if (body.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final error = decoded['error'];
+        if (error is String && error.trim().isNotEmpty) {
+          return error.trim();
+        }
+
+        final message = decoded['message'];
+        if (message is String && message.trim().isNotEmpty) {
+          return message.trim();
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
+  }
+
+  String _payMongoPaymentMethodType(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.gcash:
+        return 'gcash';
+      case PaymentMethod.maya:
+        return 'paymaya';
+      case PaymentMethod.card:
+        return 'card';
+      case PaymentMethod.cod:
+        return 'cod';
+    }
   }
 
   Widget _buildHomeBody() {

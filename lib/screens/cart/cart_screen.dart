@@ -46,7 +46,7 @@ class CartScreen extends StatefulWidget {
   final double maxDeliveryRadiusKm;
   final PaymentMethod paymentMethod;
   final ValueChanged<PaymentMethod> onPaymentMethodChanged;
-  final VoidCallback onCheckout;
+  final Future<void> Function() onCheckout;
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -573,7 +573,7 @@ class _PaymentStepView extends StatelessWidget {
   final double subtotal;
   final double total;
   final bool isDeliveryAvailable;
-  final VoidCallback onCheckout;
+  final Future<void> Function() onCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -734,7 +734,7 @@ class _PaymentStepView extends StatelessWidget {
           title: 'Total estimated cost',
           value: formatPrice(total),
           buttonLabel: 'Place Order',
-          onPressed: isDeliveryAvailable ? onCheckout : null,
+          onPressed: isDeliveryAvailable ? () => onCheckout() : null,
         ),
       ],
     );
@@ -889,6 +889,29 @@ class _CheckoutSummaryItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          width: 56,
+          height: 56,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6EFF1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.asset(
+              item.medicine.imageAsset,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.medication_outlined,
+                  color: AppColors.primaryDark,
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
           width: 34,
           height: 34,
           alignment: Alignment.center,
@@ -905,7 +928,6 @@ class _CheckoutSummaryItem extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,113 +1146,131 @@ class _PaymentMethodSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 46,
-              height: 5,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE6D8DB),
-                borderRadius: BorderRadius.circular(999),
-              ),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.72,
+        minChildSize: 0.45,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            const SizedBox(height: 18),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Choose payment method',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+            child: Column(
+              children: [
+                Container(
+                  width: 46,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6D8DB),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...PaymentMethod.values.map((method) {
-              final isSelected = method == selectedMethod;
-              final accent = _paymentAccent(method);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  onTap: () => onSelected(method),
-                  borderRadius: BorderRadius.circular(22),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? accent : const Color(0xFFF9F4F5),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color:
-                            isSelected ? accent : const Color(0xFFEFE2E5),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withValues(alpha: 0.22)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            _paymentIcon(method),
-                            color: isSelected ? Colors.white : accent,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                method.label,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                method.caption,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white.withValues(alpha: 0.86)
-                                      : AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          isSelected
-                              ? Icons.check_circle_rounded
-                              : Icons.circle_outlined,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFFBFAFB4),
-                        ),
-                      ],
+                const SizedBox(height: 18),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Choose payment method',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
-              );
-            }),
-          ],
-        ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    children: PaymentMethod.values.map((method) {
+                      final isSelected = method == selectedMethod;
+                      final accent = _paymentAccent(method);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          onTap: () => onSelected(method),
+                          borderRadius: BorderRadius.circular(22),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? accent
+                                  : const Color(0xFFF9F4F5),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: isSelected
+                                    ? accent
+                                    : const Color(0xFFEFE2E5),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Colors.white.withValues(alpha: 0.22)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    _paymentIcon(method),
+                                    color: isSelected ? Colors.white : accent,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        method.label,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        method.caption,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.86,
+                                                )
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_circle_rounded
+                                      : Icons.circle_outlined,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFFBFAFB4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
