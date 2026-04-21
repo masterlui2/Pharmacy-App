@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AppApiKeys {
   const AppApiKeys._();
 
@@ -8,11 +10,12 @@ class AppApiKeys {
   // Paste your PayMongo public key here only for local testing if needed.
   static const String paymongoPublicKey = 'pk_test_xCFPEEYusK7eCzoqUVvXKFad';
 
-  // Point this to your ASP.NET backend endpoint that creates a PayMongo Checkout
-  // Session and returns JSON like:
-  // { "checkout_url": "https://checkout.paymongo.com/..." }
-  static const String paymongoCheckoutSessionEndpoint =
-      'PUT_MY_CSHARP_BACKEND_URL_HERE';
+  static String get paymongoCheckoutSessionEndpoint {
+    if (kIsWeb) {
+      return 'http://localhost:5066/api/paymongo/create-checkout-session';
+    }
+    return 'http://10.0.2.2:5066/api/paymongo/create-checkout-session';
+  }
 
   // Keep secret keys on your backend only. Never use them in the Flutter app.
   static const String paymongoSecretKey = '';

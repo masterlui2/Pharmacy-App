@@ -29,6 +29,8 @@ class CartScreen extends StatefulWidget {
     required this.paymentMethod,
     required this.onPaymentMethodChanged,
     required this.onCheckout,
+    this.paymentStatus,
+    this.orderReference,
   });
 
   final List<CartItem> items;
@@ -47,6 +49,8 @@ class CartScreen extends StatefulWidget {
   final PaymentMethod paymentMethod;
   final ValueChanged<PaymentMethod> onPaymentMethodChanged;
   final Future<void> Function() onCheckout;
+  final String? paymentStatus;
+  final String? orderReference;
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -126,6 +130,8 @@ class _CartScreenState extends State<CartScreen> {
                               total: total,
                               isDeliveryAvailable: widget.isDeliveryAvailable,
                               onCheckout: widget.onCheckout,
+                              paymentStatus: widget.paymentStatus,
+                              orderReference: widget.orderReference,
                             ),
                     ),
             ),
@@ -158,8 +164,8 @@ class _CheckoutHeader extends StatelessWidget {
     final caption = step == _CheckoutStep.address
         ? 'Step 1 of 2'
         : deliveryDistanceKm == null
-            ? 'Distance from you: calculating... (${etaMinutes} mins)'
-            : 'Distance from you: ${deliveryDistanceKm!.toStringAsFixed(1)} km (${etaMinutes} mins)';
+            ? 'Distance from you: calculating... ($etaMinutes mins)'
+            : 'Distance from you: ${deliveryDistanceKm!.toStringAsFixed(1)} km ($etaMinutes mins)';
 
     return Row(
       children: [
@@ -211,86 +217,6 @@ class _CheckoutHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CheckoutProgress extends StatelessWidget {
-  const _CheckoutProgress({
-    required this.step,
-  });
-
-  final _CheckoutStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    final addressDone = true;
-    final paymentDone = step == _CheckoutStep.payment;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _ProgressPill(
-            label: 'Address',
-            isActive: step == _CheckoutStep.address,
-            isDone: addressDone,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ProgressPill(
-            label: 'Payment',
-            isActive: step == _CheckoutStep.payment,
-            isDone: paymentDone,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProgressPill extends StatelessWidget {
-  const _ProgressPill({
-    required this.label,
-    required this.isActive,
-    required this.isDone,
-  });
-
-  final String label;
-  final bool isActive;
-  final bool isDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final background = isActive ? AppColors.primaryDark : Colors.white;
-    final foreground = isActive ? Colors.white : AppColors.textPrimary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isActive ? AppColors.primaryDark : AppColors.secondary,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isDone ? Icons.check_circle_rounded : Icons.circle_outlined,
-            color: isActive ? Colors.white : AppColors.primaryDark,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -557,6 +483,8 @@ class _PaymentStepView extends StatelessWidget {
     required this.total,
     required this.isDeliveryAvailable,
     required this.onCheckout,
+    this.paymentStatus,
+    this.orderReference,
   });
 
   final List<CartItem> items;
@@ -574,9 +502,13 @@ class _PaymentStepView extends StatelessWidget {
   final double total;
   final bool isDeliveryAvailable;
   final Future<void> Function() onCheckout;
+  final String? paymentStatus;
+  final String? orderReference;
 
   @override
   Widget build(BuildContext context) {
+    final normalizedPaymentStatus = paymentStatus?.trim().toLowerCase();
+    final isPaymentSuccessful = normalizedPaymentStatus == 'success';
     final driverNote = address.notes.trim().isEmpty
         ? 'Add a note to driver'
         : address.notes.trim();
@@ -608,48 +540,56 @@ class _PaymentStepView extends StatelessWidget {
           child: ListView(
             children: [
               _CheckoutSection(
-                title: 'Delivery information',
-                child: Column(
-                  children: [
-                    _InfoRow(
-                      icon: Icons.location_on_outlined,
-                      title: address.shortAddress,
-                      subtitle:
-                          '${address.recipientName} - ${address.phoneNumber}',
-                      trailing: IconButton(
-                        onPressed: onEditAddress,
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                          color: AppColors.primaryDark,
-                        ),
+                title: isPaymentSuccessful ? 'Order status' : 'Delivery information',
+                child: isPaymentSuccessful
+                    ? _PaymentSuccessCard(
+                        orderReference: orderReference,
+                        address: address,
+                        deliveryDistanceKm: deliveryDistanceKm,
+                      )
+                    : Column(
+                        children: [
+                          _InfoRow(
+                            icon: Icons.location_on_outlined,
+                            title: address.shortAddress,
+                            subtitle:
+                                '${address.recipientName} - ${address.phoneNumber}',
+                            trailing: IconButton(
+                              onPressed: onEditAddress,
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _InfoRow(
+                            icon: Icons.sticky_note_2_outlined,
+                            title: driverNote,
+                            subtitle: deliveryMeta,
+                            trailing: TextButton(
+                              onPressed: onEditAddress,
+                              child: const Text('Edit'),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.sticky_note_2_outlined,
-                      title: driverNote,
-                      subtitle: deliveryMeta,
-                      trailing: TextButton(
-                        onPressed: onEditAddress,
-                        child: const Text('Edit'),
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 16),
               _CheckoutSection(
                 title: 'Order Summary',
-                actionLabel: 'Add items',
-                onActionTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Use the quantity controls below to add more items.',
-                      ),
-                    ),
-                  );
-                },
+                actionLabel: isPaymentSuccessful ? null : 'Add items',
+                onActionTap: isPaymentSuccessful
+                    ? null
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Use the quantity controls below to add more items.',
+                            ),
+                          ),
+                        );
+                      },
                 child: Column(
                   children: [
                     for (var index = 0; index < items.length; index++) ...[
@@ -706,22 +646,24 @@ class _PaymentStepView extends StatelessWidget {
                   children: [
                     _SelectedPaymentRow(
                       method: paymentMethod,
-                      onTap: showPaymentPicker,
+                      onTap: isPaymentSuccessful ? null : showPaymentPicker,
                     ),
                     const SizedBox(height: 12),
                     const Divider(height: 1, color: Color(0xFFF1E8EA)),
                     const SizedBox(height: 12),
                     _PromoRow(
-                      label: promoHint,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Promo code entry can be connected here next.',
-                            ),
-                          ),
-                        );
-                      },
+                      label: isPaymentSuccessful ? 'Payment confirmed' : promoHint,
+                      onTap: isPaymentSuccessful
+                          ? null
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Promo code entry can be connected here next.',
+                                  ),
+                                ),
+                              );
+                            },
                     ),
                   ],
                 ),
@@ -730,13 +672,206 @@ class _PaymentStepView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _BottomActionBar(
-          title: 'Total estimated cost',
-          value: formatPrice(total),
-          buttonLabel: 'Place Order',
-          onPressed: isDeliveryAvailable ? () => onCheckout() : null,
+        isPaymentSuccessful
+            ? _PaymentSuccessFooter(
+                total: total,
+                address: address,
+                deliveryDistanceKm: deliveryDistanceKm,
+              )
+            : _BottomActionBar(
+                title: 'Total estimated cost',
+                value: formatPrice(total),
+                buttonLabel: 'Place Order',
+                onPressed: isDeliveryAvailable ? () => onCheckout() : null,
+              ),
+      ],
+    );
+  }
+}
+
+class _PaymentSuccessCard extends StatelessWidget {
+  const _PaymentSuccessCard({
+    required this.orderReference,
+    required this.address,
+    required this.deliveryDistanceKm,
+  });
+
+  final String? orderReference;
+  final DeliveryAddress address;
+  final double? deliveryDistanceKm;
+
+  @override
+  Widget build(BuildContext context) {
+    final etaMinutes = deliveryDistanceKm == null
+        ? 20
+        : (12 + (deliveryDistanceKm! * 4.2)).round();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7EE),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFD1F0DA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF15803D),
+                size: 28,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Payment successful',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF14532D),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your order has been confirmed. Please wait while the pharmacy prepares your medicine for delivery.',
+            style: TextStyle(
+              color: Colors.green.shade900,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _SuccessMetaRow(
+            icon: Icons.receipt_long_outlined,
+            label: 'Order reference',
+            value: orderReference?.isNotEmpty == true
+                ? orderReference!
+                : 'Payment confirmed',
+          ),
+          const SizedBox(height: 10),
+          _SuccessMetaRow(
+            icon: Icons.local_shipping_outlined,
+            label: 'Delivery status',
+            value: 'Preparing for dispatch',
+          ),
+          const SizedBox(height: 10),
+          _SuccessMetaRow(
+            icon: Icons.schedule_rounded,
+            label: 'Estimated arrival',
+            value: '$etaMinutes mins to ${address.addressLabel}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuccessMetaRow extends StatelessWidget {
+  const _SuccessMetaRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF15803D)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            '$label: $value',
+            style: const TextStyle(
+              color: Color(0xFF166534),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _PaymentSuccessFooter extends StatelessWidget {
+  const _PaymentSuccessFooter({
+    required this.total,
+    required this.address,
+    required this.deliveryDistanceKm,
+  });
+
+  final double total;
+  final DeliveryAddress address;
+  final double? deliveryDistanceKm;
+
+  @override
+  Widget build(BuildContext context) {
+    final etaMinutes = deliveryDistanceKm == null
+        ? 20
+        : (12 + (deliveryDistanceKm! * 4.2)).round();
+
+    return _CheckoutInfoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Paid and queued for delivery',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                formatPrice(total),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'We will deliver to ${address.shortAddress}. Please keep your phone nearby while the rider is on the way.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7FAF8),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text(
+              'Estimated arrival: about $etaMinutes minutes',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -864,7 +999,7 @@ class _InfoRow extends StatelessWidget {
             ],
           ),
         ),
-        if (trailing != null) trailing!,
+        trailing ?? const SizedBox.shrink(),
       ],
     );
   }
@@ -992,49 +1127,6 @@ class _CheckoutSummaryItem extends StatelessWidget {
   }
 }
 
-class _PaymentTag extends StatelessWidget {
-  const _PaymentTag({
-    required this.method,
-  });
-
-  final PaymentMethod method;
-
-  @override
-  Widget build(BuildContext context) {
-    final isCod = method == PaymentMethod.cod;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isCod ? const Color(0xFFFFF4E8) : const Color(0xFFF4F2FB),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isCod ? Icons.payments_outlined : Icons.shield_outlined,
-            color: isCod ? const Color(0xFFC56A1A) : const Color(0xFF7A4D9E),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              isCod
-                  ? 'Cash will be collected when the order arrives.'
-                  : 'Digital payments are processed securely through PayMongo.',
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 IconData _paymentIcon(PaymentMethod method) {
   switch (method) {
     case PaymentMethod.card:
@@ -1067,7 +1159,7 @@ class _SelectedPaymentRow extends StatelessWidget {
   });
 
   final PaymentMethod method;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1077,7 +1169,9 @@ class _SelectedPaymentRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F4F5),
+          color: onTap == null
+              ? const Color(0xFFF4F2F3)
+              : const Color(0xFFF8F4F5),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
@@ -1283,42 +1377,45 @@ class _PromoRow extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F9F2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.local_offer_outlined,
-              color: Color(0xFF15803D),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
+      child: Opacity(
+        opacity: onTap == null ? 0.72 : 1,
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F9F2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.local_offer_outlined,
+                color: Color(0xFF15803D),
               ),
             ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textSecondary,
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1519,126 +1616,6 @@ class _HighlightStat extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w800,
               fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CartItemCard extends StatelessWidget {
-  const _CartItemCard({
-    required this.item,
-    required this.onRemove,
-    required this.onIncrease,
-    required this.onDecrease,
-  });
-
-  final CartItem item;
-  final VoidCallback onRemove;
-  final VoidCallback onIncrease;
-  final VoidCallback onDecrease;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 76,
-            height: 76,
-            child: Image.asset(item.medicine.imageAsset, fit: BoxFit.contain),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.medicine.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.medicine.manufacturer,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Size: ${item.medicine.packageSize}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      formatPrice(item.medicine.price),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _QuantityButton(
-                      icon: Icons.remove,
-                      onTap: item.quantity == 1 ? null : onDecrease,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${item.quantity}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _QuantityButton(
-                      icon: Icons.add,
-                      onTap: onIncrease,
-                      highlight: true,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: onRemove,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        color: Colors.grey.shade400,
-                        size: 21,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
           ),
         ],

@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:pharmacy_marketplace_app/core/config/app_api_keys.dart';
-import 'package:pharmacy_marketplace_app/core/config/maps_config.dart';
 import 'package:pharmacy_marketplace_app/data/medicine_catalog.dart';
 import 'package:pharmacy_marketplace_app/models/cart_item.dart';
 import 'package:pharmacy_marketplace_app/models/delivery_address.dart';
@@ -39,6 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   late List<CartItem> _cartItems;
   final Set<String> _wishlist = <String>{};
+  String? _checkoutPaymentStatus;
+  String? _checkoutOrderReference;
   DeliveryAddress _deliveryAddress = const DeliveryAddress(
     recipientName: 'Juan Dela Cruz',
     phoneNumber: '09171234567',
@@ -58,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _cartItems = medicineCatalog.take(3).map((medicine) {
       return CartItem(medicine: medicine, quantity: 1);
     }).toList();
+    _restoreCheckoutStateFromReturnUrl();
   }
 
   int get _cartCount =>
@@ -102,6 +106,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openHome() {
     setState(() => _selectedIndex = 0);
+  }
+
+  void _restoreCheckoutStateFromReturnUrl() {
+    if (!kIsWeb) {
+      return;
+    }
+
+    final fragment = Uri.base.fragment;
+    if (fragment.isEmpty) {
+      return;
+    }
+
+    final routeUri = Uri.parse(
+      fragment.startsWith('/') ? fragment : '/$fragment',
+    );
+    if (routeUri.path != HomeScreen.routeName) {
+      return;
+    }
+
+    final paymentStatus = routeUri.queryParameters['payment']?.trim();
+    if (paymentStatus == null || paymentStatus.isEmpty) {
+      return;
+    }
+
+    _selectedIndex = 1;
+    _checkoutPaymentStatus = paymentStatus.toLowerCase();
+    _checkoutOrderReference = routeUri.queryParameters['order']?.trim();
   }
 
   void _showAddToCartSheet(MedicineItem medicine) {
@@ -364,7 +395,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched = await launchUrl(
+      uri,
+      mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+    );
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -393,42 +427,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     const serviceFee = 15.0;
     final total = subtotal + _deliveryFee + serviceFee;
+    final requestBody = {
+      'payment_method': _payMongoPaymentMethodType(_paymentMethod),
+      'reference_number': 'order_${DateTime.now().millisecondsSinceEpoch}',
+      'currency': 'PHP',
+      'customer': {
+        'name': _deliveryAddress.recipientName,
+        'email': '',
+        'phone': _deliveryAddress.phoneNumber,
+        'address_label': _deliveryAddress.addressLabel,
+        'street_address': _deliveryAddress.streetAddress,
+        'barangay': _deliveryAddress.barangay,
+        'city': _deliveryAddress.city,
+        'notes': _deliveryAddress.notes,
+      },
+      'line_items': _cartItems
+          .map(
+            (item) => {
+              'name': item.medicine.name,
+              'description':
+                  '${item.medicine.manufacturer} - ${item.medicine.packageSize}',
+              'quantity': item.quantity,
+              'amount': (item.medicine.price * 100).round(),
+              'currency': 'PHP',
+            },
+          )
+          .toList(growable: false),
+      'summary': {
+        'subtotal': (subtotal * 100).round(),
+        'delivery_fee': (_deliveryFee * 100).round(),
+        'service_fee': (serviceFee * 100).round(),
+        'total': (total * 100).round(),
+      },
+      'success_url': _buildCheckoutReturnUrl(),
+      'cancel_url': _buildCheckoutReturnUrl(),
+    };
 
     try {
-      final response = await http.post(
-        uri,
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'payment_method': _payMongoPaymentMethodType(_paymentMethod),
-          'reference_number': 'order_${DateTime.now().millisecondsSinceEpoch}',
-          'currency': 'PHP',
-          'customer': {
-            'name': _deliveryAddress.recipientName,
-            'phone': _deliveryAddress.phoneNumber,
-            'address_label': _deliveryAddress.addressLabel,
-            'street_address': _deliveryAddress.streetAddress,
-            'barangay': _deliveryAddress.barangay,
-            'city': _deliveryAddress.city,
-            'notes': _deliveryAddress.notes,
-          },
-          'line_items': _cartItems
-              .map((item) => {
-                    'name': item.medicine.name,
-                    'description':
-                        '${item.medicine.manufacturer} - ${item.medicine.packageSize}',
-                    'quantity': item.quantity,
-                    'amount': (item.medicine.price * 100).round(),
-                    'currency': 'PHP',
-                  })
-              .toList(growable: false),
-          'summary': {
-            'subtotal': (subtotal * 100).round(),
-            'delivery_fee': (_deliveryFee * 100).round(),
-            'service_fee': (serviceFee * 100).round(),
-            'total': (total * 100).round(),
-          },
-        }),
-      ).timeout(const Duration(seconds: 20));
+      final response = await http
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = _extractBackendErrorMessage(response.body);
@@ -446,36 +488,37 @@ class _HomeScreenState extends State<HomeScreen> {
         return null;
       }
 
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backend response is not valid JSON.'),
-            ),
-          );
-        }
-        return null;
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) {
+        throw const FormatException('Backend response is not a JSON object.');
       }
 
-      final checkoutUrl = decoded['checkout_url'];
-      if (checkoutUrl is! String || checkoutUrl.trim().isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backend did not return a checkout_url.'),
-            ),
-          );
+      if (data['success'] == true && data['checkout_url'] != null) {
+        final checkoutUrl = data['checkout_url'];
+        if (checkoutUrl is String && checkoutUrl.trim().isNotEmpty) {
+          return checkoutUrl.trim();
         }
-        return null;
       }
 
-      return checkoutUrl.trim();
+      throw Exception(data['message'] ?? 'Checkout failed');
     } on http.ClientException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              kIsWeb
+                  ? 'Unable to reach the checkout backend. Check that http://localhost:5066 is running and CORS allows this Chrome app origin.'
+                  : 'Unable to connect to the checkout backend.',
+            ),
+          ),
+        );
+      }
+      return null;
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to connect to the checkout backend.'),
+            content: Text('Checkout request timed out. Please try again.'),
           ),
         );
       }
@@ -483,17 +526,19 @@ class _HomeScreenState extends State<HomeScreen> {
     } on FormatException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backend response is malformed JSON.'),
-          ),
+          const SnackBar(content: Text('Backend response is malformed JSON.')),
         );
       }
       return null;
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to contact the checkout backend.'),
+          SnackBar(
+            content: Text(
+              error is Exception
+                  ? error.toString().replaceFirst('Exception: ', '')
+                  : 'Unable to contact the checkout backend.',
+            ),
           ),
         );
       }
@@ -537,6 +582,21 @@ class _HomeScreenState extends State<HomeScreen> {
       case PaymentMethod.cod:
         return 'cod';
     }
+  }
+
+  String _buildCheckoutReturnUrl() {
+    if (kIsWeb) {
+      final baseUri = Uri.base;
+      return Uri(
+        scheme: baseUri.scheme,
+        host: baseUri.host,
+        port: baseUri.hasPort ? baseUri.port : null,
+        path: baseUri.path,
+        fragment: HomeScreen.routeName,
+      ).toString();
+    }
+
+    return 'http://localhost:5066';
   }
 
   Widget _buildHomeBody() {
@@ -608,6 +668,8 @@ class _HomeScreenState extends State<HomeScreen> {
           paymentMethod: _paymentMethod,
           onPaymentMethodChanged: _updatePaymentMethod,
           onCheckout: _checkout,
+          paymentStatus: _checkoutPaymentStatus,
+          orderReference: _checkoutOrderReference,
         );
       case 2:
         return WishlistScreen(
