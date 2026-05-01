@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:pharmacy_marketplace_app/core/constants/app_colors.dart';
 import 'package:pharmacy_marketplace_app/screens/auth/login_screen.dart';
+import 'package:pharmacy_marketplace_app/screens/home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,13 +17,26 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _routeTimer;
+
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 2), () {
+    _routeTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(LoginScreen.routeName);
+      final isSignedIn =
+          Firebase.apps.isNotEmpty && FirebaseAuth.instance.currentUser != null;
+      final routeName = isSignedIn
+          ? HomeScreen.routeName
+          : LoginScreen.routeName;
+      Navigator.of(context).pushReplacementNamed(routeName);
     });
+  }
+
+  @override
+  void dispose() {
+    _routeTimer?.cancel();
+    super.dispose();
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -397,7 +398,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final launched = await launchUrl(
       uri,
-      mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      mode: kIsWeb
+          ? LaunchMode.platformDefault
+          : LaunchMode.externalApplication,
     );
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -425,15 +428,33 @@ class _HomeScreenState extends State<HomeScreen> {
       0,
       (sum, item) => sum + (item.medicine.price * item.quantity),
     );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in before checkout.')),
+      );
+      return null;
+    }
+
+    final idToken = await _readCurrentUserIdToken(user);
+    if (idToken == null) {
+      return null;
+    }
+
+    final customerEmail = user.email?.trim() ?? '';
     const serviceFee = 15.0;
     final total = subtotal + _deliveryFee + serviceFee;
     final requestBody = {
       'payment_method': _payMongoPaymentMethodType(_paymentMethod),
       'reference_number': 'order_${DateTime.now().millisecondsSinceEpoch}',
       'currency': 'PHP',
+      'customerUid': user.uid,
+      'customerEmail': customerEmail,
+      'firebase': {'uid': user.uid, 'email': customerEmail},
       'customer': {
+        'uid': user.uid,
         'name': _deliveryAddress.recipientName,
-        'email': '',
+        'email': customerEmail,
         'phone': _deliveryAddress.phoneNumber,
         'address_label': _deliveryAddress.addressLabel,
         'street_address': _deliveryAddress.streetAddress,
@@ -467,7 +488,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final response = await http
           .post(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
             body: jsonEncode(requestBody),
           )
           .timeout(const Duration(seconds: 20));
@@ -539,6 +563,40 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? error.toString().replaceFirst('Exception: ', '')
                   : 'Unable to contact the checkout backend.',
             ),
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<String?> _readCurrentUserIdToken(User user) async {
+    try {
+      final token = await user.getIdToken();
+      final trimmedToken = token?.trim();
+      if (trimmedToken == null || trimmedToken.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'missing-token',
+          message: 'Firebase did not return an ID token.',
+        );
+      }
+      return trimmedToken;
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ?? 'Unable to authorize checkout with Firebase.',
+            ),
+          ),
+        );
+      }
+      return null;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to authorize checkout with Firebase.'),
           ),
         );
       }
