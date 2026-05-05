@@ -20,8 +20,8 @@ import 'package:pharmacy_marketplace_app/screens/home/widgets/home_featured_prod
 import 'package:pharmacy_marketplace_app/screens/home/widgets/home_header.dart';
 import 'package:pharmacy_marketplace_app/screens/home/widgets/home_promo_banner.dart';
 import 'package:pharmacy_marketplace_app/screens/home/widgets/home_section_header.dart';
+import 'package:pharmacy_marketplace_app/screens/orders/orders_screen.dart';
 import 'package:pharmacy_marketplace_app/screens/profile/profile_screen.dart';
-import 'package:pharmacy_marketplace_app/screens/wishlist/wishlist_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,8 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   late List<CartItem> _cartItems;
   final Set<String> _wishlist = <String>{};
-  String? _checkoutPaymentStatus;
-  String? _checkoutOrderReference;
+  String? _highlightedOrderReference;
   DeliveryAddress _deliveryAddress = const DeliveryAddress(
     recipientName: 'Juan Dela Cruz',
     phoneNumber: '09171234567',
@@ -67,10 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int get _cartCount =>
       _cartItems.fold<int>(0, (sum, item) => sum + item.quantity);
-
-  List<MedicineItem> get _wishlistedItems => medicineCatalog
-      .where((medicine) => _wishlist.contains(medicine.name))
-      .toList(growable: false);
 
   double get _deliveryFee {
     final distanceKm = _deliveryDistanceKm;
@@ -105,6 +100,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _selectedIndex = 1);
   }
 
+  void _openChat() {
+    setState(() => _selectedIndex = 3);
+  }
+
   void _openHome() {
     setState(() => _selectedIndex = 0);
   }
@@ -131,9 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final normalizedStatus = paymentStatus.toLowerCase();
+    final orderReference = routeUri.queryParameters['order']?.trim();
+
+    if (normalizedStatus == 'success') {
+      _selectedIndex = 2;
+      _highlightedOrderReference = orderReference;
+      _cartItems = <CartItem>[];
+      return;
+    }
+
     _selectedIndex = 1;
-    _checkoutPaymentStatus = paymentStatus.toLowerCase();
-    _checkoutOrderReference = routeUri.queryParameters['order']?.trim();
   }
 
   void _showAddToCartSheet(MedicineItem medicine) {
@@ -417,12 +424,14 @@ class _HomeScreenState extends State<HomeScreen> {
         !uri.hasScheme ||
         (uri.scheme != 'http' && uri.scheme != 'https')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('The checkout-session backend URL is invalid.'),
+        SnackBar(
+          content: Text('The checkout backend URL is invalid: $endpoint'),
         ),
       );
       return null;
     }
+
+    final backendOrigin = uri.hasAuthority ? uri.origin : endpoint;
 
     final subtotal = _cartItems.fold<double>(
       0,
@@ -527,12 +536,13 @@ class _HomeScreenState extends State<HomeScreen> {
       throw Exception(data['message'] ?? 'Checkout failed');
     } on http.ClientException {
       if (mounted) {
+        final frontendOrigin = kIsWeb ? Uri.base.origin : null;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               kIsWeb
-                  ? 'Unable to reach the checkout backend. Check that http://localhost:5066 is running and CORS allows this Chrome app origin.'
-                  : 'Unable to connect to the checkout backend.',
+                  ? 'Unable to reach the checkout backend at $backendOrigin. Make sure the C# POS API is running and CORS allows $frontendOrigin.'
+                  : 'Unable to connect to the checkout backend at $backendOrigin.',
             ),
           ),
         );
@@ -726,17 +736,11 @@ class _HomeScreenState extends State<HomeScreen> {
           paymentMethod: _paymentMethod,
           onPaymentMethodChanged: _updatePaymentMethod,
           onCheckout: _checkout,
-          paymentStatus: _checkoutPaymentStatus,
-          orderReference: _checkoutOrderReference,
         );
       case 2:
-        return WishlistScreen(
-          items: _wishlistedItems,
-          onAddToCart: (medicine) {
-            _addToCart(medicine, 1);
-            _showAddToCartSnackBar(medicine, 1);
-          },
-          onRemove: _toggleWishlist,
+        return OrdersScreen(
+          highlightedOrderReference: _highlightedOrderReference,
+          onOpenSupportChat: _openChat,
         );
       case 3:
         return const ChatScreen();

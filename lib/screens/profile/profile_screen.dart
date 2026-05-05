@@ -97,7 +97,7 @@ class ProfileScreen extends StatelessWidget {
               _ProfileRow(
                 icon: Icons.receipt_long_outlined,
                 title: 'Order history',
-                subtitle: 'Track medicines, receipts, and delivery updates',
+                subtitle: 'Use the Orders tab to track status and delivery updates',
                 trailing: Icons.chevron_right_rounded,
               ),
               _OrderTrackingRows(user: firebaseUser),

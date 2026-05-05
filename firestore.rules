@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isCustomerOrder(orderId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/orders/$(orderId)).data.customerUid == request.auth.uid;
+    }
+
     match /users/{uid} {
       allow read, create, update: if signedIn() && request.auth.uid == uid;
       allow delete: if false;
@@ -16,6 +21,37 @@ service cloud.firestore {
         resource.data.customerUid == request.auth.uid;
 
       allow create, update, delete: if false;
+    }
+
+    match /orders/{orderId}/messages/{messageId} {
+      allow read: if isCustomerOrder(orderId);
+
+      allow create: if isCustomerOrder(orderId) &&
+        request.resource.data.keys().hasOnly([
+          'type',
+          'text',
+          'orderId',
+          'orderReference',
+          'senderUid',
+          'senderRole',
+          'senderName',
+          'recipientRole',
+          'pharmacistUid',
+          'createdAt',
+        ]) &&
+        request.resource.data.type == 'text' &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 2000 &&
+        request.resource.data.orderId == orderId &&
+        request.resource.data.senderUid == request.auth.uid &&
+        request.resource.data.senderRole == 'customer' &&
+        request.resource.data.senderName is string &&
+        request.resource.data.senderName.size() > 0 &&
+        request.resource.data.recipientRole == 'pharmacist' &&
+        request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
     }
 
     match /medicines/{medicineId} {

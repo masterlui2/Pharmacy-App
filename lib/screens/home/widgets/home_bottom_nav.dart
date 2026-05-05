@@ -31,9 +31,9 @@ class HomeBottomNav extends StatelessWidget {
           label: 'Cart',
         ),
         NavigationDestination(
-          icon: Icon(Icons.favorite_border_rounded),
-          selectedIcon: Icon(Icons.favorite_rounded),
-          label: 'Wishlist',
+          icon: Icon(Icons.receipt_long_outlined),
+          selectedIcon: Icon(Icons.receipt_long_rounded),
+          label: 'Orders',
         ),
         NavigationDestination(
           icon: Icon(Icons.chat_bubble_outline_rounded),
