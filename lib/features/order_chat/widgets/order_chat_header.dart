@@ -6,108 +6,177 @@ import '../models/order_summary.dart';
 class OrderChatHeader extends StatelessWidget {
   const OrderChatHeader({
     super.key,
-    required this.selectedOrder,
-    required this.orders,
-    required this.onOrderSelected,
+    required this.order,
+    required this.messageCount,
+    this.isWideLayout = false,
   });
 
-  final OrderSummary selectedOrder;
-  final List<OrderSummary> orders;
-  final ValueChanged<String> onOrderSelected;
+  final OrderSummary order;
+  final int messageCount;
+  final bool isWideLayout;
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = _statusColorFor(order);
+    final statusLabel = order.statusLabel;
+    final messageLabel = messageCount == 1
+        ? '1 message'
+        : '$messageCount messages';
+
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFECEEF3))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE8ECF3))),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        child: Column(
+        padding: EdgeInsets.fromLTRB(
+          isWideLayout ? 24 : 16,
+          isWideLayout ? 18 : 16,
+          isWideLayout ? 24 : 16,
+          isWideLayout ? 18 : 16,
+        ),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                _ThreadAvatar(order: selectedOrder),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        selectedOrder.displayPharmacistName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${selectedOrder.pharmacyName} - ${selectedOrder.statusLabel}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ),
+            CircleAvatar(
+              radius: isWideLayout ? 28 : 24,
+              backgroundColor: _threadAccentFor(order),
+              child: Text(
+                _initialsFor(order),
+                style: TextStyle(
+                  color: AppColors.primaryDark,
+                  fontSize: isWideLayout ? 18 : 16,
+                  fontWeight: FontWeight.w800,
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selectedOrder.requiresPrescription
-                        ? const Color(0xFFFFF0D6)
-                        : AppColors.secondary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    selectedOrder.requiresPrescription
-                        ? 'Prescription'
-                        : 'Order chat',
-                    style: const TextStyle(
-                      color: AppColors.primaryDark,
-                      fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    order.displayPharmacistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: isWideLayout ? 18 : 17,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Your orders',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Order #${order.orderReference} | ${order.pharmacyName}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _HeaderChip(
+                        icon: Icons.circle,
+                        label: statusLabel,
+                        foreground: statusColor,
+                        iconSize: 10,
+                      ),
+                      if (order.requiresPrescription)
+                        const _HeaderChip(
+                          icon: Icons.description_outlined,
+                          label: 'Prescription required',
+                          foreground: AppColors.warning,
+                        ),
+                      _HeaderChip(
+                        icon: Icons.inventory_2_outlined,
+                        label: order.isAssigned
+                            ? 'Pharmacist assigned'
+                            : 'Awaiting pharmacist',
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 102,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: orders.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final order = orders[index];
-                  return _OrderSelectorCard(
-                    order: order,
-                    isSelected: order.orderId == selectedOrder.orderId,
-                    onTap: () => onOrderSelected(order.orderId),
-                  );
-                },
+            if (isWideLayout) ...[
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    statusLabel,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    messageLabel,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderChip extends StatelessWidget {
+  const _HeaderChip({
+    required this.icon,
+    required this.label,
+    this.foreground = AppColors.textPrimary,
+    this.iconSize = 16,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foreground;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.5,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F7FB),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFE4E8F0)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: foreground, size: iconSize),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -117,155 +186,49 @@ class OrderChatHeader extends StatelessWidget {
   }
 }
 
-class _ThreadAvatar extends StatelessWidget {
-  const _ThreadAvatar({required this.order});
+String _initialsFor(OrderSummary order) {
+  final source = order.displayPharmacistName.trim().isNotEmpty
+      ? order.displayPharmacistName.trim()
+      : order.pharmacyName.trim();
+  final parts = source
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
 
-  final OrderSummary order;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = order.requiresPrescription
-        ? const Color(0xFFFFF0D6)
-        : order.isActive
-            ? const Color(0xFFE5F7EE)
-            : AppColors.secondary;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: accent,
-          child: Icon(
-            order.isAssigned
-                ? Icons.local_pharmacy_rounded
-                : Icons.support_agent_rounded,
-            color: AppColors.textPrimary,
-            size: 22,
-          ),
-        ),
-        Positioned(
-          right: -1,
-          bottom: -1,
-          child: Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: order.isAssigned ? AppColors.success : AppColors.warning,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-          ),
-        ),
-      ],
-    );
+  if (parts.isEmpty) {
+    return 'PH';
   }
+
+  if (parts.length == 1) {
+    final segment = parts.first;
+    return segment.length >= 2
+        ? segment.substring(0, 2).toUpperCase()
+        : segment.toUpperCase();
+  }
+
+  return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
 }
 
-class _OrderSelectorCard extends StatelessWidget {
-  const _OrderSelectorCard({
-    required this.order,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final OrderSummary order;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 220,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : const Color(0xFFF8F9FC),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isSelected
-                    ? AppColors.primary
-                    : const Color(0xFFE7EAF0),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order #${order.orderReference}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  order.pharmacyName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white.withValues(alpha: 0.92)
-                        : AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  order.displayPharmacistName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white.withValues(alpha: 0.86)
-                        : AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Icon(
-                      order.isAssigned
-                          ? Icons.circle_rounded
-                          : Icons.schedule_rounded,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.9)
-                          : order.isAssigned
-                              ? AppColors.success
-                              : AppColors.warning,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        order.statusLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+Color _statusColorFor(OrderSummary order) {
+  if (order.isClosed) {
+    return AppColors.warning;
   }
+
+  if (order.isActive) {
+    return AppColors.success;
+  }
+
+  return AppColors.primaryDark;
+}
+
+Color _threadAccentFor(OrderSummary order) {
+  if (order.requiresPrescription) {
+    return const Color(0xFFFFF4E2);
+  }
+
+  if (order.isActive) {
+    return const Color(0xFFEAF8F1);
+  }
+
+  return const Color(0xFFFFEEF1);
 }

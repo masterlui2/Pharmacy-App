@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/order_chat_message.dart';
 import '../models/order_summary.dart';
-import '../utils/order_chat_firestore_reader.dart';
 
 class OrderChatRepository {
   OrderChatRepository({
@@ -44,6 +43,7 @@ class OrderChatRepository {
         .doc(orderId)
         .collection('messages')
         .orderBy('createdAt')
+        .limitToLast(150)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs
@@ -66,52 +66,11 @@ class OrderChatRepository {
       return;
     }
 
-    final senderName = await _resolveCustomerDisplayName(user);
-    final orderReference = order.orderReference.trim().isEmpty
-        ? order.orderId
-        : order.orderReference.trim();
-    final orderDoc = _orders.doc(order.orderId);
-
-    await orderDoc.collection('messages').add({
-      'type': 'text',
-      'text': normalizedText,
-      'orderId': order.orderId,
-      'orderReference': orderReference,
-      'senderUid': user.uid,
+    await _orders.doc(order.orderId).collection('messages').add({
+      'senderId': user.uid,
       'senderRole': OrderChatMessage.customerRole,
-      'senderName': senderName,
-      'recipientRole': OrderChatMessage.pharmacistRole,
+      'text': normalizedText,
       'createdAt': FieldValue.serverTimestamp(),
     });
-
-    await orderDoc.update({
-      'lastMessageAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<String> _resolveCustomerDisplayName(User user) async {
-    final displayName = user.displayName?.trim();
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
-
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final userData = userDoc.data();
-    if (userData != null) {
-      final profileName = readStringByPaths(
-        userData,
-        const ['fullName', 'name', 'displayName'],
-      );
-      if (profileName != null) {
-        return profileName;
-      }
-    }
-
-    final email = user.email?.trim();
-    if (email != null && email.isNotEmpty) {
-      return email;
-    }
-
-    return 'Customer';
   }
 }

@@ -5,14 +5,10 @@ import '../utils/order_chat_firestore_reader.dart';
 class OrderChatMessage {
   const OrderChatMessage({
     required this.messageId,
-    required this.type,
     required this.text,
-    required this.orderId,
-    required this.orderReference,
-    required this.senderUid,
+    required this.senderId,
     required this.senderRole,
     required this.senderName,
-    required this.recipientRole,
     required this.createdAt,
     required this.hasPendingWrites,
   });
@@ -28,15 +24,12 @@ class OrderChatMessage {
 
     return OrderChatMessage(
       messageId: doc.id,
-      type: readStringByPaths(data, const ['type']) ?? 'text',
       text: readStringByPaths(data, const ['text', 'message', 'body']) ?? '',
-      orderId: readStringByPaths(data, const ['orderId']) ?? '',
-      orderReference: readStringByPaths(
+      senderId: readStringByPaths(
             data,
-            const ['orderReference', 'referenceNumber', 'reference_number'],
+            const ['senderId', 'senderUid', 'authorUid'],
           ) ??
           '',
-      senderUid: readStringByPaths(data, const ['senderUid', 'authorUid']) ?? '',
       senderRole:
           (readStringByPaths(data, const ['senderRole', 'role']) ??
                   pharmacistRole)
@@ -47,29 +40,23 @@ class OrderChatMessage {
             const ['senderName', 'authorName', 'displayName'],
           ) ??
           '',
-      recipientRole:
-          readStringByPaths(data, const ['recipientRole'])?.toLowerCase(),
       createdAt: readDateTimeByPaths(data, const ['createdAt', 'timestamp']),
       hasPendingWrites: doc.metadata.hasPendingWrites,
     );
   }
 
   final String messageId;
-  final String type;
   final String text;
-  final String orderId;
-  final String orderReference;
-  final String senderUid;
+  final String senderId;
   final String senderRole;
   final String senderName;
-  final String? recipientRole;
   final DateTime? createdAt;
   final bool hasPendingWrites;
 
   bool get isSystem => senderRole == systemRole;
 
   bool isFromCustomer(String currentUserUid) =>
-      senderRole == customerRole || senderUid == currentUserUid;
+      senderRole == customerRole || senderId == currentUserUid;
 
   String get timestampLabel =>
       formatChatTimestamp(createdAt, isPending: hasPendingWrites);

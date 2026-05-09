@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:pharmacy_marketplace_app/core/constants/app_colors.dart';
 
@@ -45,43 +47,47 @@ class OrderMessagesPane extends StatelessWidget {
         onMessageCountChanged(order.orderId, messages.length);
 
         if (messages.isEmpty) {
-          return ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-            children: [
-              _ConversationIntroCard(order: order),
-              _EmptyConversationState(order: order),
-            ],
-          );
+          return _EmptyConversationState(order: order);
         }
 
-        return ListView.builder(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-          itemCount: messages.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return _ConversationIntroCard(order: order);
-            }
+        return DecoratedBox(
+          decoration: const BoxDecoration(color: Colors.white),
+          child: ListView.builder(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final message = messages[index];
+              final previous = index > 0 ? messages[index - 1] : null;
+              final next = index + 1 < messages.length
+                  ? messages[index + 1]
+                  : null;
 
-            final message = messages[index - 1];
-            final previous = index > 1 ? messages[index - 2] : null;
-            final next = index < messages.length ? messages[index] : null;
+              final startsGroup =
+                  previous == null ||
+                  !_belongsToSameGroup(previous, message, currentUserUid);
+              final endsGroup =
+                  next == null ||
+                  !_belongsToSameGroup(message, next, currentUserUid);
+              final showDateDivider =
+                  previous == null ||
+                  !_isSameDay(previous.createdAt, message.createdAt);
 
-            final startsGroup =
-                previous == null ||
-                !_belongsToSameGroup(previous, message, currentUserUid);
-            final endsGroup =
-                next == null || !_belongsToSameGroup(message, next, currentUserUid);
-
-            return _MessageBubble(
-              message: message,
-              order: order,
-              currentUserUid: currentUserUid,
-              startsGroup: startsGroup,
-              endsGroup: endsGroup,
-            );
-          },
+              return Column(
+                children: [
+                  if (showDateDivider)
+                    _DateDivider(label: _dateLabelFor(message.createdAt)),
+                  _MessageBubble(
+                    message: message,
+                    order: order,
+                    currentUserUid: currentUserUid,
+                    startsGroup: startsGroup,
+                    endsGroup: endsGroup,
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
@@ -107,115 +113,14 @@ bool _belongsToSameGroup(
   return previous.senderName.trim() == current.senderName.trim();
 }
 
-class _ConversationIntroCard extends StatelessWidget {
-  const _ConversationIntroCard({required this.order});
-
-  final OrderSummary order;
-
-  @override
-  Widget build(BuildContext context) {
-    final orderStatusColor = order.isActive
-        ? AppColors.success
-        : order.isClosed
-            ? AppColors.warning
-            : AppColors.primaryDark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF7EA),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Order #${order.orderReference}',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoChip(
-                icon: Icons.person_outline_rounded,
-                label: order.displayPharmacistName,
-              ),
-              _InfoChip(
-                icon: Icons.receipt_long_outlined,
-                label: order.statusLabel,
-                foreground: orderStatusColor,
-              ),
-              _InfoChip(
-                icon: Icons.storefront_outlined,
-                label: order.pharmacyName,
-              ),
-              if (order.requiresPrescription)
-                const _InfoChip(
-                  icon: Icons.description_outlined,
-                  label: 'Prescription required',
-                  foreground: AppColors.warning,
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            order.isAssigned
-                ? 'Messages in this thread are linked to your order and are shared with the pharmacist and POS backend.'
-                : 'Your order has no assigned pharmacist yet. The POS can assign one later and continue using this same thread.',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.35,
-            ),
-          ),
-        ],
-      ),
-    );
+bool _isSameDay(DateTime? left, DateTime? right) {
+  if (left == null || right == null) {
+    return false;
   }
-}
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    this.foreground = AppColors.primaryDark,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: foreground, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  final a = left.toLocal();
+  final b = right.toLocal();
+  return a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 class _EmptyConversationState extends StatelessWidget {
@@ -225,50 +130,92 @@ class _EmptyConversationState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFECEEF3)),
+    final message = order.isAssigned
+        ? 'Send your first message and the pharmacist will respond here.'
+        : 'This order does not have an assigned pharmacist yet. You can start the conversation now and keep using the same thread later.';
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: Colors.white),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFD),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE3E8F0)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: _threadAccentFor(order),
+                    child: Icon(
+                      order.isAssigned
+                          ? Icons.local_pharmacy_rounded
+                          : Icons.support_agent_rounded,
+                      size: 28,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'No messages yet',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.secondary,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.forum_outlined,
-              color: AppColors.primaryDark,
-              size: 26,
-            ),
+    );
+  }
+}
+
+class _DateDivider extends StatelessWidget {
+  const _DateDivider({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F5F9),
+            borderRadius: BorderRadius.circular(999),
           ),
-          const SizedBox(height: 14),
-          const Text(
-            'No messages yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            order.isAssigned
-                ? 'Start the conversation for this order and the pharmacist replies will appear here.'
-                : 'You can send the first message now. Once a pharmacist is assigned in the POS, replies will appear in this thread.',
-            textAlign: TextAlign.center,
+          child: Text(
+            label,
             style: const TextStyle(
               color: AppColors.textSecondary,
-              height: 1.4,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -291,102 +238,145 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.isSystem) {
+      return _SystemMessageBubble(message: message);
+    }
+
     final isCustomer = message.isFromCustomer(currentUserUid);
-    final senderLabel = _senderLabel();
-    final accent = order.requiresPrescription
-        ? const Color(0xFFFFF0D6)
-        : order.isActive
-            ? const Color(0xFFE5F7EE)
-            : AppColors.secondary;
+    final maxBubbleWidth = math.min(
+      MediaQuery.sizeOf(context).width * 0.72,
+      520.0,
+    );
 
     return Padding(
       padding: EdgeInsets.only(
         top: startsGroup ? 10 : 2,
-        bottom: endsGroup ? 6 : 2,
+        bottom: endsGroup ? 10 : 2,
       ),
       child: Row(
-        mainAxisAlignment:
-            isCustomer ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isCustomer
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isCustomer) ...[
             endsGroup
                 ? CircleAvatar(
-                    radius: 13,
-                    backgroundColor: accent,
+                    radius: 16,
+                    backgroundColor: _threadAccentFor(order),
                     child: Icon(
-                      message.isSystem
-                          ? Icons.info_outline_rounded
-                          : Icons.local_pharmacy_rounded,
+                      Icons.local_pharmacy_rounded,
                       color: AppColors.textPrimary,
-                      size: 14,
+                      size: 16,
                     ),
                   )
-                : const SizedBox(width: 26),
-            const SizedBox(width: 6),
+                : const SizedBox(width: 32),
+            const SizedBox(width: 10),
           ],
-          Flexible(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-              ),
-              child: Column(
-                crossAxisAlignment:
-                    isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  if (!isCustomer && startsGroup && senderLabel.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6, bottom: 4),
-                      child: Text(
-                        senderLabel,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: _bubbleColor(isCustomer),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(18),
-                        topRight: const Radius.circular(18),
-                        bottomLeft:
-                            Radius.circular(!isCustomer && endsGroup ? 5 : 18),
-                        bottomRight:
-                            Radius.circular(isCustomer && endsGroup ? 5 : 18),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      child: Text(
-                        message.text,
-                        style: TextStyle(
-                          color: isCustomer ? Colors.white : AppColors.textPrimary,
-                          height: 1.32,
-                        ),
-                      ),
-                    ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: isCustomer ? AppColors.primary : Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomLeft: Radius.circular(
+                    isCustomer ? 20 : (endsGroup ? 8 : 20),
                   ),
-                  if (endsGroup) ...[
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
+                  bottomRight: Radius.circular(
+                    isCustomer ? (endsGroup ? 8 : 20) : 20,
+                  ),
+                ),
+                border: isCustomer
+                    ? null
+                    : Border.all(color: const Color(0xFFE3E8F0)),
+                boxShadow: isCustomer
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF101828,
+                          ).withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!isCustomer && startsGroup)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _senderLabel(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              message.timestampLabel,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Text(
+                      message.text,
+                      style: TextStyle(
+                        color: isCustomer
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (isCustomer && endsGroup) ...[
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          message.timestampLabel,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ] else if (!isCustomer && endsGroup && !startsGroup) ...[
+                      const SizedBox(height: 6),
+                      Text(
                         message.timestampLabel,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 10,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -395,28 +385,83 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Color _bubbleColor(bool isCustomer) {
-    if (isCustomer) {
-      return AppColors.primary;
-    }
-
-    if (message.isSystem) {
-      return const Color(0xFFF4F5F8);
-    }
-
-    return const Color(0xFFF1F2F6);
-  }
-
   String _senderLabel() {
     final senderName = message.senderName.trim();
     if (senderName.isNotEmpty) {
       return senderName;
     }
 
-    if (message.isSystem) {
-      return 'System';
-    }
-
     return order.displayPharmacistName;
   }
+}
+
+class _SystemMessageBubble extends StatelessWidget {
+  const _SystemMessageBubble({required this.message});
+
+  final OrderChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F5F9),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            message.text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _dateLabelFor(DateTime? date) {
+  if (date == null) {
+    return 'Conversation';
+  }
+
+  final local = date.toLocal();
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final suffix = local.hour >= 12 ? 'PM' : 'AM';
+
+  return '${months[local.month - 1]} ${local.day}, ${local.year} $hour:$minute $suffix';
+}
+
+Color _threadAccentFor(OrderSummary order) {
+  if (order.requiresPrescription) {
+    return const Color(0xFFFFF4E2);
+  }
+
+  if (order.isActive) {
+    return const Color(0xFFEAF8F1);
+  }
+
+  return const Color(0xFFFFEEF1);
 }
